@@ -1,0 +1,12 @@
+# requirements.txt
+# ---------- 核心 ----------
+requests
+Pillow
+openai
+
+# ---------- 配置与展示 ----------
+PyYAML
+tqdm
+
+# ---------- 测试 ----------
+pytest

@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  vllm-omni-qwen:
+    # 镜像地址：使用南京镜像站下载并 load 后的镜像
+    image: quay.nju.edu.cn/ascend/vllm-omni:v0.28.0
+    container_name: Qwen-Image2.1-omni
+
+    # 共享内存调大，Diffusion 模型推理对 shm 需求较高
+    shm_size: "256g"
+
+    # 需要特权模式才能完整访问 NPU 驱动与设备节点
+    privileged: true
+
+    # 端口映射：宿主机 8014 -> 容器 8014
+    ports:
+      - "0.0.0.0:8014:8014"
+
+    environment:
+      # ===== 容器级设备可见性 =====
+      # 让容器能看见全部 8 张 NPU 卡（0~7）
+      - ASCEND_VISIBLE_DEVICES=0-7
+
+      # ===== 进程级设备选择（关键） =====
+      # 只让 vLLM 进程使用 5 号卡（物理 davinci5，64G 未被占用）
+      - ASCEND_RT_VISIBLE_DEVICES=5
+
+      # ===== vLLM / 昇腾平台相关环境变量 =====
+      - VLLM_PLATFORM=ascend                         # 指定 vLLM 使用昇腾平台后端
+      - VLLM_WORKER_MULTIPROC_METHOD=spawn           # 昇腾场景下多进程启动方式必须为 spawn
+      - VLLM_USE_MODELSCOPE=0                        # 0 表示不从 ModelScope 拉取模型
+      - PYTORCH_NPU_ALLOC_CONF=expandable_segments:True  # 显存分配策略，减少碎片
+      - DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA       # 910B 上必须显式指定，否则会无日志挂死
+
+    volumes:
+      # 模型权重目录：宿主机 /opt/data/models 挂到容器同名路径
+      - /opt/data/models:/opt/data/models
+      # 离线安装包目录：方便容器内直接访问 diffusers 与 transformers 安装文件
+      - .:/workspace/deploy
+      # 以下为昇腾驱动、工具、信息文件的标准挂载
+      - /usr/local/dcmi:/usr/local/dcmi
+      - /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool
+      - /usr/local/bin/npu-smi:/usr/local/bin/npu-smi
+      - /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/
+      - /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info
+      - /etc/ascend_install.info:/etc/ascend_install.info
+      # 缓存目录，避免每次重下
+      - /root/.cache:/root/.cache
+      # /tmp 共享，便于在宿主机直接查看容器日志
+      - /tmp:/tmp
+
+    devices:
+      # 映射全部 8 张 NPU 卡（davinci0~davinci7）
+      - /dev/davinci0
+      - /dev/davinci1
+      - /dev/davinci2
+      - /dev/davinci3
+      - /dev/davinci4
+      - /dev/davinci5
+      - /dev/davinci6
+      - /dev/davinci7
+      # 以下为昇腾管理设备，必须挂载
+      - /dev/davinci_manager
+      - /dev/devmm_svm
+      - /dev/hisi_hdc
+
+    # 覆盖默认入口，让容器常驻，方便进入执行补丁与启动命令
+    command: sleep infinity

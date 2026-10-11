@@ -1,0 +1,84 @@
+# ============================================================
+# Qwen-Image-2.1-deploy-pro .gitignore
+# ============================================================
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# ---------- 虚拟环境 ----------
+venv/
+.venv/
+env/
+ENV/
+.python-version
+
+# ---------- 测试与缓存 ----------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.cache/
+
+# ---------- 离线安装包与镜像（体积大，不提交） ----------
+offline_pkgs/
+*.whl
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+vllm-omni-*.tar
+diffusers-main.tar.gz
+
+# ---------- 模型权重与数据 ----------
+# 模型权重通常挂载在宿主机 /opt/data/models，不在项目内
+# 若项目 data/ 存放参考图、掩码等，按需忽略内容但保留目录
+data/*
+!data/.gitkeep
+
+# ---------- 生成结果与日志 ----------
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.bmp
+*.gif
+*.log
+logs/
+outputs/
+results/
+
+# ---------- Docker 运行时 ----------
+# docker-compose 覆盖文件、本地环境变量
+docker-compose.override.yml
+.env
+.env.*
+
+# ---------- IDE / 编辑器 ----------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ---------- 操作系统 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- 其他 ----------
+*.bak
+*.tmp
+*.temp
