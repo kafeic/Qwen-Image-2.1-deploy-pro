@@ -19,6 +19,8 @@ Qwen-Image-2.1-deploy-pro/
 └── deploy/
     ├── docker-compose.yml
     ├── patches/
+    │   ├── patch_rope.py
+    │   └── patch_rope3.py
     ├── start_service.sh
     ├── diffusers-main.tar.gz
     └── transformers-5.17.0-py3-none-any.whl
@@ -50,24 +52,41 @@ pip install /vllm-workspace/diffusers-main/
 pip install /workspace/deploy/transformers-5.17.0-py3-none-any.whl
 ```
 
-### 4. 应用 NPU 补丁
+### 4.（可选）备份 diffusers 源码
+补丁脚本会**自动**把被打补丁的文件备份到
+`/vllm-workspace/diffusers-main.bak/...`，此步可跳过。
+如需保留整份源码的干净备份，可执行：
+```bash
+cp -r /vllm-workspace/diffusers-main /vllm-workspace/diffusers-main.bak
+```
+`.bak` 仅用于恢复与对照，**不参与运行**，补丁脚本会跳过它。
+
+### 5. 应用 NPU 补丁（按顺序执行）
 ```bash
 python /workspace/deploy/patches/patch_rope.py
 python /workspace/deploy/patches/patch_rope3.py
 ```
+两个脚本均已**幂等**（重复执行安全）：
+- 首次运行自动创建 `.bak` 备份（先备份、后补丁）。
+- 已打过的补丁自动跳过。
+- 单条补丁 MISS 不会阻塞其余补丁的保存。
 
-### 5. 验证补丁是否生效（期望输出 5）
+> 本补丁来自 Ascend-SACT/Qwen-Image-2.1 开源项目，本项目对其做了修改与
+> bug 修复（原 `patch_rope3.py` 在 `sys.exit(1)` 前未保存文件，导致补丁数
+> 停在 4）。若本脚本仍报 [MISS]，说明 diffusers 版本不兼容，请参考原项目。
+
+### 6. 验证补丁是否生效（期望输出 5）
 ```bash
 bash -c 'P=$(python3 -c "import diffusers,os;print(os.path.join(os.path.dirname(diffusers.__file__),\"models/transformers/transformer_qwenimage21.py\"))"); grep -c "npu patch" "$P"'
 ```
 如果输出不是 5，请检查 diffusers 是否安装成功，以及补丁脚本是否与当前 diffusers main 兼容。
 
-### 6. 启动推理服务（后台）
+### 7. 启动推理服务（后台）
 ```bash
 nohup bash /workspace/deploy/start_service.sh > /tmp/qwen_image_2_1_vllm.log 2>&1 &
 ```
 
-### 7. 等待约 1 分钟后检查日志
+### 8. 等待约 1 分钟后检查日志
 ```bash
 grep "Application startup complete" /tmp/qwen_image_2_1_vllm.log
 ```

@@ -1,0 +1,56 @@
+# ============================================================
+# 分镜镜头模板
+# ------------------------------------------------------------
+# 可用变量（Jinja2）：
+#   {{character}} 角色外观描述（由 characters.yaml 注入）
+#   {{action}}    角色动作 / 事件
+#   {{scene}}     场景 / 环境
+#   {{mood}}      情绪氛围 / 光影
+#   {{style}}     风格预设描述（由 styles.yaml 注入）
+#
+# 新增镜头：复制一段，改 id / name / template 即可。
+# ============================================================
+
+shot_types:
+  - id: establishing
+    name: 建立镜头（远景）
+    desc: 交代环境与人物位置
+    template: >-
+      cinematic establishing wide shot, {{character}} {{action}},
+      in {{scene}}, {{mood}} atmosphere, {{style}},
+      film still, 35mm, natural lighting, deep depth of field
+
+  - id: medium
+    name: 中景
+    desc: 对话与动作的常用镜头
+    template: >-
+      cinematic medium shot, {{character}} {{action}}, in {{scene}},
+      {{mood}}, {{style}}, shallow depth of field, film still
+
+  - id: closeup
+    name: 特写
+    desc: 强调情绪与表情
+    template: >-
+      cinematic close-up shot, {{character}} {{action}}, {{mood}},
+      {{style}}, detailed face, dramatic lighting, film still
+
+  - id: over_shoulder
+    name: 过肩镜头
+    desc: 增强视线代入感
+    template: >-
+      cinematic over-the-shoulder shot, {{character}} {{action}},
+      {{scene}} in the background, {{mood}}, {{style}}, film still
+
+  - id: low_angle
+    name: 仰拍
+    desc: 强化压迫感 / 英雄感
+    template: >-
+      cinematic low-angle shot, {{character}} {{action}}, in {{scene}},
+      {{mood}}, {{style}}, dramatic perspective, film still
+
+  - id: insert
+    name: 空镜 / 道具特写
+    desc: 无主角的环境或道具镜头，用于转场
+    template: >-
+      cinematic insert shot of {{scene}}, {{action}}, {{mood}},
+      {{style}}, no people, detailed textures, film still

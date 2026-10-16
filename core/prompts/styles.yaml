@@ -1,0 +1,40 @@
+# ============================================================
+# 风格预设（短剧分镜 / 游戏角色共用）
+# 注入分镜或资产模板的 {{style}} 变量。
+# ============================================================
+
+styles:
+  - id: cinematic_real
+    name: 电影写实
+    prompt: >-
+      photorealistic cinematic film still, 35mm, natural color grading,
+      high detail, 8k
+
+  - id: anime_2d
+    name: 2D 动漫
+    prompt: >-
+      2D anime style, clean line art, cel shading, vibrant colors,
+      key visual quality
+
+  - id: ink_wash
+    name: 水墨国风
+    prompt: >-
+      Chinese ink wash painting style, elegant brush strokes, minimal,
+      xuan paper texture
+
+  - id: cyberpunk
+    name: 赛博朋克
+    prompt: >-
+      cyberpunk style, neon lights, rain, futuristic city, high contrast,
+      cinematic
+
+  - id: game_concept
+    name: 游戏原画
+    prompt: >-
+      game concept art, digital painting, highly detailed, dramatic rim
+      lighting, artstation trending
+
+  - id: pixel_art
+    name: 像素风
+    prompt: >-
+      pixel art, 16-bit, retro game style, crisp pixels, limited palette

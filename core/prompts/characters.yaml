@@ -1,0 +1,48 @@
+# ============================================================
+# AI 短剧角色库
+# ------------------------------------------------------------
+# 每个角色提供一段英文外观描述，出图时注入分镜模板的 {{character}} 变量，
+# 保证同一角色跨镜头外观一致。
+#
+# 字段：
+#   id         唯一标识（代码 / 下拉使用，勿随意改）
+#   name       中文名
+#   tags       标签，便于筛选
+#   appearance 英文外观描述（会注入 {{character}}）
+#   negative   该角色的额外负向提示词（可选，防止脸/服装漂移）
+# ============================================================
+
+characters:
+  - id: lin_wan
+    name: 林晚
+    tags: [女主, 都市, 悬疑]
+    appearance: >-
+      Lin Wan, a 25-year-old Chinese woman, short black bob hair,
+      calm sharp eyes, pale blue trench coat, slim build,
+      consistent face and hairstyle
+    negative: "different hairstyle, changing face, different person"
+
+  - id: chen_mo
+    name: 陈默
+    tags: [男主, 侦探]
+    appearance: >-
+      Chen Mo, a 30-year-old Chinese man, short messy black hair,
+      light stubble, dark grey windbreaker, tired but determined gaze,
+      consistent face
+    negative: "clean-shaven, different hairstyle, different person"
+
+  - id: qi_zong
+    name: 齐总
+    tags: [反派, 商界]
+    appearance: >-
+      Boss Qi, a 50-year-old Chinese man, slicked-back grey hair,
+      black tailored suit, cold confident smile, gold watch
+    negative: "young face, casual clothes, different person"
+
+  - id: xiao_yu
+    name: 小雨
+    tags: [配角, 学生]
+    appearance: >-
+      Xiao Yu, an 18-year-old Chinese girl, long straight black hair,
+      white shirt and navy school uniform skirt, bright curious eyes
+    negative: "different hairstyle, changing face"

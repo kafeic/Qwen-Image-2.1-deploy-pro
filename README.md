@@ -12,16 +12,14 @@
 
 - 外网拉取镜像、离线导出与内网加载
 - 容器化启动、离线安装 diffusers 与 transformers
-- 应用昇腾 NPU 兼容补丁
+- 应用昇腾 NPU 兼容补丁（**已修复原补丁脚本的 bug，并支持幂等重跑**）
 - 启动推理服务并验证
 - 提供文生图、图像编辑、透明图生成等测试脚本
+- **可调试的核心模块**：API 客户端、YAML 提示词库、示例工作流、Gradio 调试台
 - 并发配置与调优建议
 
 项目名称：`Qwen-Image-2.1-deploy-pro`
 > 作者：kafeic
-> **注意事项**：当前项目中 core 中的代码当前只是 AI 生成的示例，
-> 且并未校验，未与项目结构中的对齐，当前项目只完成了部署的流程。
-> 核心工作流的模块实现建议本地实践与开发，后续将会上传通用工作流。
 
 ---
 
@@ -29,32 +27,35 @@
 
 ```
 Qwen-Image-2.1-deploy-pro/
-├── core/                       # 自定义工作流、提示词、封装配置、client
-│   ├── prompts/                # 提示词模板
-│   ├── workflows/              # 工作流定义
-│   ├── client.py               # API 客户端封装
-│   └── config.yaml             # 核心配置
-├── data/                       # 图生图待定文件夹（参考图、掩码等）
+├── core/                       # 核心模块
+│   ├── config.yaml             # 核心配置（API / 生成 / 路径 / 调试）
+│   ├── config.py               # 配置加载器
+│   ├── client.py               # API 客户端封装（OpenAI 兼容）
+│   ├── prompts/                # 提示词库（YAML 单文件，可直接编辑）
+│   │   ├── __init__.py         #   加载器（支持 Jinja2 变量渲染）
+│   │   ├── characters.yaml     #   短剧角色库
+│   │   ├── shots.yaml          #   分镜镜头模板
+│   │   ├── styles.yaml         #   风格预设
+│   │   ├── game.yaml           #   游戏角色 / 资产模板
+│   │   └── negative.yaml       #   负向提示词
+│   └── workflows/              # 工作流定义
+│       ├── base.py             #   工作流基类
+│       ├── storyboard.py       #   AI 短剧分镜工作流
+│       └── game_character.py   #   游戏角色 / 资产工作流
+├── data/                       # 参考图、输出图（data/outputs）
 ├── deploy/                     # 部署相关文件
 │   ├── docker-compose.yml      # 容器编排文件
 │   ├── patches/                # NPU 兼容补丁
 │   │   ├── patch_rope.py
 │   │   └── patch_rope3.py
-│   ├── start_service.sh        # 推理服务启动脚本
+│   ├── start_service.sh        # 推理服务启动脚本（含可调参数注释）
 │   ├── vllm-omni.conf          # Nginx 反向代理配置
 │   └── deploy.md               # 部署步骤说明
 ├── offline_whls/               # 外网 whls 依赖包下载目录
 ├── test/                       # 测试脚本
-│   ├── check_health.sh
-│   ├── test_t2i_basic.sh
-│   ├── test_t2i_full.py
-│   ├── test_t2i_openai_sdk.py
-│   ├── test_t2i_batch.py
-│   ├── test_t2i_2k.py
-│   └── test_t2i_transparent.py
-├── .gitignore
+├── app.py                      # Gradio 调试台（文生图 / 短剧分镜 / 游戏角色）
+├── main.py                     # 命令行入口（示例用法）
 ├── requirements.txt
-├── main.py                     # 主入口（可扩展）
 └── README.md
 ```
 
@@ -168,8 +169,10 @@ Qwen-Image-2.1-deploy-pro/
   - 项目目录挂载：`.:/workspace/deploy`，容器内通过 `/workspace/deploy/` 访问部署文件
 
 - **`start_service.sh`**：
+  - `ASCEND_RT_VISIBLE_DEVICES=5`：只使用 5 号卡（按需修改）
   - `--port 8014`：容器内服务端口，与 compose 端口映射一致
   - `--diffusion-attention-backend TORCH_SDPA`：910B3 上推荐使用，稳定优先
+  - 脚本内已用注释列出常用可调参数（并发、VAE 切片/平铺、显存、日志等），按需取消注释
 
 ### 4. 启动容器
 
@@ -199,12 +202,24 @@ pip install /vllm-workspace/diffusers-main/
 pip install /workspace/deploy/transformers-5.17.0-py3-none-any.whl
 ```
 
-### 7. 应用 NPU 补丁
+### 7. 应用 NPU 补丁（按顺序执行）
 
 ```bash
 python /workspace/deploy/patches/patch_rope.py
 python /workspace/deploy/patches/patch_rope3.py
 ```
+
+两个脚本均已**幂等**，可安全重复执行：
+
+- **首次运行自动创建 `.bak` 备份**（先备份、后补丁），无需手动 `cp`。
+  备份位于 `/vllm-workspace/diffusers-main.bak/...`，**不参与运行**，补丁会跳过它。
+- 已打过的补丁自动跳过。
+- 单条补丁 MISS 不会阻塞其余补丁的保存。
+
+> **关于补丁的说明**：本补丁源自 Ascend-SACT/Qwen-Image-2.1 开源项目，本项目
+> 对其做了**修改与 bug 修复**——原 `patch_rope3.py` 在 `sys.exit(1)` 前未保存文件，
+> 导致 edit B 丢失、补丁数停在 4。若本脚本在你的 diffusers 版本上仍报 `[MISS]`，
+> 说明版本不兼容，请参考原项目补丁自行核对目标代码。
 
 ### 8. 验证补丁是否生效（期望输出 5）
 
@@ -238,43 +253,19 @@ grep "Application startup complete" /tmp/qwen_image_2_1_vllm.log
 cd /home/deploy/Qwen-Image-2.1-deploy-pro/test
 ```
 
-### 完整参数 Python 测试
-
-```bash
-python test_t2i_full.py
-```
-
-### OpenAI SDK 调用测试
-
-```bash
-python test_t2i_openai_sdk.py
-```
-
-### 批量并发生图
-
-```bash
-python test_t2i_batch.py
-```
-
-### 2K 分辨率生图
-
-```bash
-python test_t2i_2k.py
-```
-
-### 透明图生成
-
-```bash
-python test_t2i_transparent.py
-```
+| 脚本 | 说明 |
+|------|------|
+| `test_t2i_full.py` | 完整参数文生图 |
+| `test_t2i_openai_sdk.py` | OpenAI SDK 调用 |
+| `test_t2j_batch.py` | 批量并发生图（注意文件名为 t2j） |
+| `test_t2i_2k.py` | 2K 分辨率生图 |
+| `test_t2i_transparent.py` | 透明图生成 |
 
 所有脚本默认请求 `http://localhost:8014`，与 `start_service.sh` 端口一致。
 
-> `check_health.sh` 与 `test_t2i_basic.sh` 暂未提供，后续补充。
-
 ---
 
-## 🎨 功能说明
+## 🎨 模型功能说明
 
 Qwen-Image-2.1 是一个统一的图像生成与编辑模型，主要能力包括：
 
@@ -290,11 +281,120 @@ Qwen-Image-2.1 是一个统一的图像生成与编辑模型，主要能力包�
 
 ---
 
+## 🧩 核心模块与工作流
+
+### 配置
+
+所有可调项集中在 `core/config.yaml`，改完无需动代码：
+
+```yaml
+api:
+  base_url: "http://localhost:8014"   # 直连容器映射端口
+  model_name: "Qwen/Qwen-Image-2.1"
+  api_style: "openai_images"          # openai_images | chat
+generation:
+  width: 1024
+  height: 1024
+  num_inference_steps: 40
+  guidance_scale: 1.0                 # 1.0 = 不启用 CFG
+  seed: 42
+debug:
+  log_payload: true                   # 打印请求 payload，便于调试
+  save_metadata: true                 # 出图时同目录写 .json 元数据
+```
+
+### 客户端
+
+```python
+from core import OmniClient
+
+client = OmniClient()
+print(client.health())                 # 健康检查
+img = client.generate("一只在雨中的猫")  # 返回 PIL.Image
+client.save(img, "data/outputs/cat.png", metadata={"prompt": "..."})
+```
+
+### 提示词库（可直接编辑）
+
+提示词全部放在 `core/prompts/*.yaml`，支持 Jinja2 变量，改文件即生效：
+
+```yaml
+# core/prompts/shots.yaml
+- id: closeup
+  name: 特写
+  template: >-
+    cinematic close-up shot, {{character}} {{action}}, {{mood}},
+    {{style}}, detailed face, dramatic lighting, film still
+```
+
+```python
+from core import PROMPTS
+PROMPTS.character("lin_wan")["appearance"]     # 取角色外观
+PROMPTS.render_shot("closeup", character="...", action="...",
+                    scene="...", mood="...", style="...")
+```
+
+### 工作流示例
+
+**① AI 短剧分镜**（`core/workflows/storyboard.py`）
+
+```python
+from core.workflows import StoryboardWorkflow
+
+wf = StoryboardWorkflow()
+results = wf.run(StoryboardWorkflow.demo_script())   # 内置 4 镜示例剧本
+for shot, (img, path) in results:
+    print(shot.shot_type, "->", path)
+```
+
+**② 游戏角色 / 资产**（`core/workflows/game_character.py`）
+
+```python
+from core.workflows import GameCharacterWorkflow
+
+wf = GameCharacterWorkflow()
+img, path = wf.render_asset(
+    "character_sheet", "hero",
+    "a young swordsman, silver hair, blue cloak, glowing rune sword",
+    "game_concept",
+)
+```
+
+### 命令行入口
+
+```bash
+python main.py health                 # 检查服务状态
+python main.py t2i "一只在雨中的猫"    # 文生图
+python main.py storyboard             # 运行示例剧本（4 镜）
+python main.py game                   # 生成游戏角色三视图
+```
+
+---
+
+## 🖥️ Gradio 调试台
+
+```bash
+pip install -r requirements.txt
+python app.py                         # 默认 http://127.0.0.1:7860
+python app.py --host 0.0.0.0 --port 7860   # 内网访问
+```
+
+页面标签：
+
+1. **文生图** —— 自由提示词出图，可调分辨率 / 步数 / 引导系数 / 种子
+2. **短剧分镜** —— 选角色 / 镜头 / 风格，逐镜生成；一键运行示例剧本（4 镜）
+3. **游戏角色** —— 三视图 / 概念图 / 头像 / 道具
+4. **服务状态** —— 健康检查、模型列表、当前配置
+
+每个标签页都带「调试信息」面板，显示**实际组装的 prompt 与请求参数**，方便排查。
+
+---
+
 ## ⚡ 并发配置
 
-当前 `start_service.sh` **未设置 `--max-num-seqs`**，默认串行执行（并发数=1）。
+`start_service.sh` 默认**未设置 `--max-num-seqs`**，即串行执行（并发数=1）。
 
-如需开启并发，在 `start_service.sh` 的 `vllm serve` 命令中增加：
+如需开启并发，在 `start_service.sh` 的 `vllm serve` 命令中增加（脚本内已有注释示例）：
 
 ```bash
 --max-num-seqs 4
@@ -312,7 +412,12 @@ Qwen-Image-2.1 是一个统一的图像生成与编辑模型，主要能力包�
 ## ❓ 常见问题
 
 **Q：补丁验证输出不是 5？**  
-A：确认 diffusers 源码已成功安装，且补丁脚本在安装之后执行。检查 `transformer_qwenimage21.py` 路径是否正确。
+A：确认 diffusers 源码已成功安装，且补丁脚本在安装之后执行。本项目的补丁脚本已
+修复「`sys.exit(1)` 导致补丁数停在 4」的 bug，可重复执行；若仍报 `[MISS]`，说明
+diffusers 版本与补丁不兼容，请参考原项目补丁核对目标代码。
+
+**Q：补丁脚本报 `.bak` 相关错误？**  
+A：本项目的补丁脚本会**自动创建** `.bak` 备份，无需手动准备。`.bak` 不参与运行。
 
 **Q：服务启动后无日志或挂死？**  
 A：确认 `--diffusion-attention-backend TORCH_SDPA` 已设置。910B3 上使用 `FLASH_ATTN` 可能导致无日志挂死。
@@ -337,7 +442,7 @@ A：使用外网下载好的 `diffusers-main.tar.gz` 和 `transformers-5.17.0-py
 
 ## 🙏 致谢
 
-- [补丁来源](https://ai.gitcode.com/Ascend-SACT/Qwen-Image-2.1)
+- [补丁来源](https://ai.gitcode.com/Ascend-SACT/Qwen-Image-2.1)（本项目对其补丁做了修改与 bug 修复）
 - [vLLM-Omni](https://github.com/vllm-project/vllm-omni)
 - [Qwen-Image-2.1](https://modelscope.cn/models/Qwen/Qwen-Image-2.1)
 - [Ascend-SACT/Qwen-Image-2.1](https://ai.gitcode.com/Ascend-SACT/Qwen-Image-2.1)

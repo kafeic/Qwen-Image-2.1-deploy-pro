@@ -1,111 +1,173 @@
+# -*- coding: utf-8 -*-
 """
-模型调用配置
-所有与 vLLM-Omni 服务通信相关的配置集中在此，便于统一修改。
+配置加载模块
+
+从 ``core/config.yaml`` 读取配置，转成 dataclass 供上层使用。
+可通过环境变量 ``QWEN_IMAGE_CONFIG`` 指定其它配置文件路径。
+
+用法：
+    from core.config import CONFIG
+    CONFIG.api.base_url
 """
+from __future__ import annotations
+
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Dict
+
+import yaml
+
+# ============================================================
+# 路径常量
+# ============================================================
+CORE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CORE_DIR.parent
+DEFAULT_CONFIG_PATH = CORE_DIR / "config.yaml"
+CONFIG_PATH = Path(os.environ.get("QWEN_IMAGE_CONFIG", DEFAULT_CONFIG_PATH))
 
 
 # ============================================================
-# 项目路径配置
-# ============================================================
-PROJECT_ROOT = Path(__file__).parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
-RAW_DIR = DATA_DIR / "raw"
-AUGMENTED_DIR = DATA_DIR / "augmented"
-
-
-# ============================================================
-# API 服务配置
+# 配置数据结构
 # ============================================================
 @dataclass
 class APIConfig:
     """vLLM-Omni API 服务配置"""
 
-    # 服务地址（通过 Nginx 代理后的地址）
-    # 内网服务器 IP + Nginx 对外端口 + location 前缀
-    base_url: str = "http://123.123.xx.xx:8443/qwen-images-2.1"
-
-    # API 版本前缀（与 vLLM-Omni 一致）
+    base_url: str = "http://localhost:8014"
     api_prefix: str = "/v1"
-
-    # 模型名称（用于请求体中的 model 字段）
-    model_name: str = "Qwen-Image-2.1"
-
-    # 请求超时（秒），图像生成耗时长，设置较大
+    model_name: str = "Qwen/Qwen-Image-2.1"
+    api_style: str = "openai_images"   # openai_images | chat
     timeout: int = 600
-
-    # 连接超时（秒）
     connect_timeout: int = 30
-
-    # 失败重试次数
     max_retries: int = 2
 
     @property
     def generate_endpoint(self) -> str:
-        """文生图端点"""
-        return f"{self.base_url}{self.api_prefix}/chat/completions"
+        """文生图端点（OpenAI 兼容）"""
+        return f"{self.base_url}{self.api_prefix}/images/generations"
 
     @property
     def edit_endpoint(self) -> str:
-        """图像编辑端点"""
+        """图像编辑端点（OpenAI 兼容）"""
         return f"{self.base_url}{self.api_prefix}/images/edits"
 
     @property
+    def chat_endpoint(self) -> str:
+        """多模态对话端点"""
+        return f"{self.base_url}{self.api_prefix}/chat/completions"
+
+    @property
+    def models_endpoint(self) -> str:
+        """模型列表端点"""
+        return f"{self.base_url}{self.api_prefix}/models"
+
+    @property
     def health_endpoint(self) -> str:
-        """健康检查端点"""
+        """健康检查端点（vLLM 根路径 /health）"""
         return f"{self.base_url}/health"
 
 
-# ============================================================
-# 图像生成默认参数
-# ============================================================
 @dataclass
 class GenerationConfig:
-    """图像生成的默认参数"""
+    """图像生成默认参数"""
 
-    # 分辨率
-    height: int = 1024
     width: int = 1024
-
-    # 采样步数（30 步为质量与速度的平衡点）
-    num_inference_steps: int = 30
-
-    # 无分类器引导系数
-    # = 1.0 时关闭 CFG；> 1.0 时启用，增强提示词控制力
-    cfg_scale: float = 4.0
-
-    # 随机种子（固定可复现）
+    height: int = 1024
+    num_inference_steps: int = 40
+    guidance_scale: float = 1.0
     seed: int = 42
-
-    # 每次请求生成的图像数量
-    n: int = 1
-
-    # 输出格式
     output_format: str = "png"
 
-
-# ============================================================
-# 全局配置实例
-# ============================================================
-API_CONFIG = APIConfig()
-GEN_CONFIG = GenerationConfig()
+    @property
+    def size(self) -> str:
+        """OpenAI 风格的 "WxH" 尺寸字符串"""
+        return f"{self.width}x{self.height}"
 
 
+@dataclass
+class PathsConfig:
+    """项目路径配置（相对项目根目录）"""
+
+    data_dir: str = "data"
+    raw_dir: str = "data/raw"
+    output_dir: str = "data/outputs"
+
+    @property
+    def data_path(self) -> Path:
+        return PROJECT_ROOT / self.data_dir
+
+    @property
+    def raw_path(self) -> Path:
+        return PROJECT_ROOT / self.raw_dir
+
+    @property
+    def output_path(self) -> Path:
+        return PROJECT_ROOT / self.output_dir
+
+
+@dataclass
+class DebugConfig:
+    """调试开关"""
+
+    log_payload: bool = True
+    save_metadata: bool = True
+
+
+@dataclass
+class Config:
+    """聚合配置"""
+
+    api: APIConfig = field(default_factory=APIConfig)
+    generation: GenerationConfig = field(default_factory=GenerationConfig)
+    paths: PathsConfig = field(default_factory=PathsConfig)
+    debug: DebugConfig = field(default_factory=DebugConfig)
+
+
 # ============================================================
-# 目录初始化
+# 加载逻辑
 # ============================================================
-def ensure_dirs():
-    """确保所有必要目录存在"""
-    for d in [RAW_DIR, AUGMENTED_DIR]:
+def _section(raw: Dict[str, Any], key: str) -> Dict[str, Any]:
+    """取配置段，缺省返回空字典"""
+    value = raw.get(key) or {}
+    if not isinstance(value, dict):
+        raise ValueError(f"config.yaml 中 `{key}` 必须是映射（dict）")
+    return value
+
+
+def load_config(path: Path | str = CONFIG_PATH) -> Config:
+    """从 YAML 加载配置；文件不存在时使用全默认值。"""
+    path = Path(path)
+    raw: Dict[str, Any] = {}
+    if path.exists():
+        with open(path, encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+    return Config(
+        api=APIConfig(**_section(raw, "api")),
+        generation=GenerationConfig(**_section(raw, "generation")),
+        paths=PathsConfig(**_section(raw, "paths")),
+        debug=DebugConfig(**_section(raw, "debug")),
+    )
+
+
+def ensure_dirs(cfg: Config | None = None) -> None:
+    """确保输出目录存在"""
+    cfg = cfg or CONFIG
+    for d in (cfg.paths.raw_path, cfg.paths.output_path):
         d.mkdir(parents=True, exist_ok=True)
-    for sub in ["fallen_states", "backgrounds", "brands", "text2img"]:
-        (AUGMENTED_DIR / sub).mkdir(parents=True, exist_ok=True)
+
+
+# 全局单例
+CONFIG = load_config()
+
+# 兼容旧引用
+API_CONFIG = CONFIG.api
+GEN_CONFIG = CONFIG.generation
 
 
 __all__ = [
-    "PROJECT_ROOT", "DATA_DIR", "RAW_DIR", "AUGMENTED_DIR",
-    "APIConfig", "GenerationConfig",
-    "API_CONFIG", "GEN_CONFIG",
-    "ensure_dirs",
+    "CORE_DIR", "PROJECT_ROOT", "CONFIG_PATH",
+    "APIConfig", "GenerationConfig", "PathsConfig", "DebugConfig", "Config",
+    "load_config", "ensure_dirs",
+    "CONFIG", "API_CONFIG", "GEN_CONFIG",
 ]

@@ -1,26 +1,29 @@
+# -*- coding: utf-8 -*-
 """
-氧气瓶数据增强核心模块
+Qwen-Image-2.1 核心模块
+
+- 配置：    core.config        （读取 core/config.yaml）
+- 客户端：  core.client        （OmniClient，OpenAI 兼容 API）
+- 提示词库：core.prompts       （YAML + Jinja2，可外部编辑）
+- 工作流：  core.workflows     （短剧分镜 / 游戏角色）
 """
-from .config import (
-    API_CONFIG, GEN_CONFIG, APIConfig, GenerationConfig,
-    RAW_DIR, AUGMENTED_DIR, ensure_dirs,
-)
-from .client import OmniClient
-from .augmentation import AugmentationPipeline
-from .prompts import (
-    STATE_EDIT_PROMPTS,
-    BACKGROUND_EDIT_PROMPTS,
-    APPEARANCE_EDIT_PROMPTS,
-    TEXT2IMG_PROMPTS,
-    ALL_EDIT_PROMPTS,
-    get_prompts_by_category,
+from .config import CONFIG, Config, APIConfig, GenerationConfig, PathsConfig, ensure_dirs
+from .client import OmniClient, OmniClientError
+from .prompts import PROMPTS, PromptLibrary, get_prompt_library
+from .workflows import (
+    BaseWorkflow,
+    Shot,
+    StoryboardWorkflow,
+    GameCharacterWorkflow,
 )
 
 __all__ = [
-    "API_CONFIG", "GEN_CONFIG", "APIConfig", "GenerationConfig",
-    "RAW_DIR", "AUGMENTED_DIR", "ensure_dirs",
-    "OmniClient", "AugmentationPipeline",
-    "STATE_EDIT_PROMPTS", "BACKGROUND_EDIT_PROMPTS",
-    "APPEARANCE_EDIT_PROMPTS", "TEXT2IMG_PROMPTS",
-    "ALL_EDIT_PROMPTS", "get_prompts_by_category",
+    # 配置
+    "CONFIG", "Config", "APIConfig", "GenerationConfig", "PathsConfig", "ensure_dirs",
+    # 客户端
+    "OmniClient", "OmniClientError",
+    # 提示词
+    "PROMPTS", "PromptLibrary", "get_prompt_library",
+    # 工作流
+    "BaseWorkflow", "Shot", "StoryboardWorkflow", "GameCharacterWorkflow",
 ]

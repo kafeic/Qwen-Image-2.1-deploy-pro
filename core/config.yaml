@@ -1,0 +1,44 @@
+# ============================================================
+# Qwen-Image-2.1 核心配置
+# 所有可调项集中在此文件；修改后无需改代码。
+# ============================================================
+
+# ---------- API 服务 ----------
+api:
+  # 直连容器映射端口（宿主机 8014）
+  # 经 Nginx 反向代理时改为： http://<内网IP>:8443/qwen-images-2.1
+  base_url: "http://localhost:8014"
+  api_prefix: "/v1"
+
+  # 服务模型名，需与 vllm serve 暴露的名称一致
+  # 可用 client.list_models() 查询；不匹配时服务端会报 model not found
+  model_name: "Qwen/Qwen-Image-2.1"
+
+  # 请求风格：
+  #   openai_images —— POST /v1/images/generations（OpenAI 兼容，test/ 脚本已验证）
+  #   chat          —— POST /v1/chat/completions（多模态对话式，部分部署适用）
+  api_style: "openai_images"
+
+  timeout: 600          # 单次请求总超时（秒），出图耗时长
+  connect_timeout: 30   # 连接超时（秒）
+  max_retries: 2        # 失败重试次数（指数退避）
+
+# ---------- 生成默认参数 ----------
+generation:
+  width: 1024
+  height: 1024
+  num_inference_steps: 40   # 采样步数，质量与速度平衡点
+  guidance_scale: 1.0       # 1.0 = 不启用 CFG（Qwen-Image-2.1 默认）
+  seed: 42                  # 随机种子，固定可复现
+  output_format: "png"
+
+# ---------- 路径 ----------
+paths:
+  data_dir: "data"
+  raw_dir: "data/raw"
+  output_dir: "data/outputs"
+
+# ---------- 调试 ----------
+debug:
+  log_payload: true     # 打印每次请求的 payload 与耗时，便于排查
+  save_metadata: true   # 出图时同目录保存同名 .json 元数据（含完整 prompt 与参数）

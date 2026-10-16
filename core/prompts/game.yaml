@@ -1,0 +1,54 @@
+# ============================================================
+# 游戏角色 / 资产模板
+# ------------------------------------------------------------
+# 可用变量（Jinja2）：
+#   {{role}}       角色定位描述（由下方 roles 注入）
+#   {{appearance}} 外观描述（用户输入或引用角色库）
+#   {{style}}      风格预设描述（由 styles.yaml 注入）
+# ============================================================
+
+# 角色定位
+roles:
+  - id: hero
+    name: 主角
+    prompt: "heroic protagonist, confident pose"
+  - id: villain
+    name: 反派
+    prompt: "menacing antagonist, intimidating presence"
+  - id: support
+    name: 辅助 / 伙伴
+    prompt: "supporting ally, friendly expression"
+  - id: npc
+    name: NPC
+    prompt: "ordinary townsfolk, everyday clothing"
+
+# 资产类型模板
+asset_types:
+  - id: character_sheet
+    name: 角色三视图
+    desc: 正 / 侧 / 背，用于建模参考
+    template: >-
+      game character turnaround sheet, {{role}}, {{appearance}},
+      full body, front view, side view, back view, neutral pose,
+      white background, {{style}}, character design sheet
+
+  - id: concept
+    name: 角色概念图
+    desc: 单张精绘概念
+    template: >-
+      game character concept art, {{role}}, {{appearance}}, dynamic pose,
+      dramatic lighting, detailed costume design, {{style}}
+
+  - id: portrait
+    name: 角色头像
+    desc: 头像 / 立绘
+    template: >-
+      game character portrait, {{role}}, {{appearance}}, bust shot,
+      expressive face, centered composition, {{style}}
+
+  - id: item
+    name: 道具图标
+    desc: 游戏道具 / 装备
+    template: >-
+      game item icon, {{appearance}}, centered, clean neutral background,
+      soft shadow, {{style}}

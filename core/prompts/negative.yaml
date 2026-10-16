@@ -1,0 +1,21 @@
+# ============================================================
+# 负向提示词库
+# 工作流按场景选用：default 为通用兜底，其余按用途叠加。
+# ============================================================
+
+negative:
+  default: >-
+    low quality, blurry, worst quality, distorted, deformed, bad anatomy,
+    extra limbs, extra fingers, mutated hands, watermark, text, signature,
+    jpeg artifacts, oversaturated
+
+  character: >-
+    inconsistent face, changing hairstyle, changing costume, different person,
+    duplicate character
+
+  storyboard: >-
+    multiple panels, collage, split screen, contact sheet, text overlay,
+    subtitles, frame border, ui elements
+
+  game: >-
+    multiple characters, crowd, background clutter, off-center subject
